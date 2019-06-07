@@ -27,13 +27,14 @@ func NewHTTPClient(formats strfmt.Registry) *Netlify {
 func NewRetryableHTTPClient(formats strfmt.Registry, attempts int) *Netlify {
 	cfg := plumbing.DefaultTransportConfig()
 	transport := httptransport.New(cfg.Host, cfg.BasePath, cfg.Schemes)
+	runt := runtime.New(cfg.Host, cfg.BasePath, cfg.Schemes)
 
-	return NewRetryable(transport, formats, attempts)
+	return NewRetryable(runt, transport, formats, attempts)
 }
 
 // NewRetryable creates a new netlify client with a number of attempts for rate limits.
-func NewRetryable(transport runtime.ClientTransport, formats strfmt.Registry, attempts int) *Netlify {
-	tr := http.NewRetryableTransport(transport, attempts)
+func NewRetryable(runt httptransport.Runtime, transport runtime.ClientTransport, formats strfmt.Registry, attempts int) *Netlify {
+	tr := http.NewRetryableTransport(runt, transport, attempts)
 	return New(tr, formats)
 }
 

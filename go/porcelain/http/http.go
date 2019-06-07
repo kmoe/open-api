@@ -2,6 +2,7 @@ package http
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/go-openapi/runtime"
+	runtimeClient "github.com/go-openapi/runtime/client"
 )
 
 var DefaultTransport = httpTransport()
@@ -16,26 +18,33 @@ var DefaultTransport = httpTransport()
 type RetryableTransport struct {
 	tr       runtime.ClientTransport
 	attempts int
+	runtime  runtimeClient.Runtime
 }
 
 type retryableRoundTripper struct {
 	tr       http.RoundTripper
 	attempts int
+	runtime runtimeClient.Runtime
 }
 
-func NewRetryableTransport(tr runtime.ClientTransport, attempts int) *RetryableTransport {
+func NewRetryableTransport(runt *runtimeClient.Runtime, tr runtime.ClientTransport, attempts int) *RetryableTransport {
 	return &RetryableTransport{
 		tr:       tr,
 		attempts: attempts,
+		runtime:  *runt,
 	}
 }
 
+// the thing implementing Submit is the ClientTransport!
 func (t *RetryableTransport) Submit(op *runtime.ClientOperation) (interface{}, error) {
+	fmt.Println("[KATY] Netlify submit is happening")
 	client := op.Client
+	fmt.Printf("%+v", client)
 
 	if client == nil {
 		client = http.DefaultClient
 	}
+	fmt.Printf("%+v", client)
 
 	transport := client.Transport
 	if transport == nil {
@@ -44,6 +53,7 @@ func (t *RetryableTransport) Submit(op *runtime.ClientOperation) (interface{}, e
 	client.Transport = &retryableRoundTripper{
 		tr:       transport,
 		attempts: t.attempts,
+		runtime: t.runtime,
 	}
 
 	op.Client = client
@@ -57,6 +67,7 @@ func (t *RetryableTransport) Submit(op *runtime.ClientOperation) (interface{}, e
 }
 
 func (t *retryableRoundTripper) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	fmt.Println("[KATY] Netlify retryable round trip is happening")
 	rr := autorest.NewRetriableRequest(req)
 
 	for attempt := 0; attempt < t.attempts; attempt++ {
@@ -65,7 +76,7 @@ func (t *retryableRoundTripper) RoundTrip(req *http.Request) (resp *http.Respons
 			return resp, err
 		}
 
-		resp, err = t.tr.RoundTrip(rr.Request())
+		resp, err = t.runtime.Transport.RoundTrip(rr.Request())
 
 		if err != nil || resp.StatusCode != http.StatusTooManyRequests {
 			return resp, err

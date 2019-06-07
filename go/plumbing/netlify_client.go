@@ -44,11 +44,11 @@ func NewHTTPClientWithConfig(formats strfmt.Registry, cfg *TransportConfig) *Net
 
 	// create transport and client
 	transport := httptransport.New(cfg.Host, cfg.BasePath, cfg.Schemes)
-	return New(transport, formats)
+	return New(transport, transport, formats)
 }
 
 // New creates a new netlify client
-func New(transport runtime.ClientTransport, formats strfmt.Registry) *Netlify {
+func New(runt *httptransport.Runtime, transport runtime.ClientTransport, formats strfmt.Registry) *Netlify {
 	// ensure nullable parameters have default
 	if formats == nil {
 		formats = strfmt.Default
@@ -58,6 +58,8 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *Netlify {
 	cli.Transport = transport
 
 	cli.Operations = operations.New(transport, formats)
+
+	cli.Runtime = runt
 
 	return cli
 }
@@ -106,6 +108,8 @@ type Netlify struct {
 	Operations *operations.Client
 
 	Transport runtime.ClientTransport
+
+	Runtime *httptransport.Runtime
 }
 
 // SetTransport changes the transport on the client and all its subresources
